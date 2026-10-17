@@ -7,26 +7,15 @@ from pyrogram.types import Message
 from google import genai
 from google.genai import types
 
-# ==================== CONFIGURATION ====================
-API_ID = 38074255  # Apna API ID yahan daalein (Integer)
-API_HASH = "b24d8bf27bba4316a37c4bf2a7e9b9cf"  # Apna API HASH yahan daalein
-GEMINI_API_KEY = "AQ.Ab8RN6JOOWHKx7N3AqVMgjTmBqmYUdct3ro03oxCinpCxTLwhw"  # Google AI Studio se free key daalein
+# ==================== SAFE CONFIGURATION ====================
+API_ID = int(os.getenv("API_ID", "0"))
+API_HASH = os.getenv("API_HASH", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+SESSION_STRING = os.getenv("SESSION_STRING", "")
 BOT_NAME = "KSHATRIYA JARVIS"
-SESSION_STRING = "BQJE948AKyGe3jgMEA8xSp-yzz4n5KdY1VrYLK-EWGOVL7aYNUblqizWwo9RB6C7RB4mt03PjkqCdNuOGnN_VhJo0U7Q3fZL6OnfYFmCoUGvStWeWCX5Y-nvn_mYLPcaN0-Q7O95WD8bNVSKnQ-Ji0n3_bAW2z8NqJwZI4cWvj7nzofoke23Ux7dvJ0zZP2brIQfanf-QS0rvuv2EsYXe1KaFMATrSpMdtH1gwUFbjLTIqZewztWAaBG3Gabupbrmwgo_-SvAvXzGdWzX9Wv6rCNFACC3Esy0LQRzJRDlVpbkQu1XO8LyS88eT-KhE_5SpW8GMK7y5L3o24EyN4GM9JqzqGO7QAAAAG_2mhyAA"
-# =======================================================
-
+# ============================================================
 app = Client("kshatriya_jarvis", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
-# Agar key 'AQ.' se start hoti hai toh vertexai=True lagayein, warna normal
-if GEMINI_API_KEY.startswith("AQ."):
-    ai_client = genai.Client(vertexai=True, api_key=GEMINI_API_KEY)
-else:
-    ai_client = genai.Client(api_key=GEMINI_API_KEY)
-# Folders & Database Setup
-CACHE_DIR = os.path.abspath("jarvis_cache")
-os.makedirs(CACHE_DIR, exist_ok=True)
-
-conn = sqlite3.connect("jarvis_brain.db", check_same_thread=False)
-cursor = conn.cursor()
+ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Table 1: Messages & Media Cache (For Anti-Delete & Anti-Edit)
 cursor.execute("""

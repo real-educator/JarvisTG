@@ -17,8 +17,7 @@ SESSION_STRING = "BQJE948AKyGe3jgMEA8xSp-yzz4n5KdY1VrYLK-EWGOVL7aYNUblqizWwo9RB6
 
 app = Client("kshatriya_jarvis", api_id=API_ID, api_hash=API_HASH)
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
-session_string=SESSION_STRING
-)
+session_string=SESSION_STRING)
 
 # Folders & Database Setup
 CACHE_DIR = os.path.abspath("jarvis_cache")

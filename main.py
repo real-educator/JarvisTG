@@ -264,9 +264,12 @@ async def catch_delete(client: Client, messages: list):
 # FEATURE 4: GROQ AI JARVIS BRAIN (100% Free & Ultra-Fast)
 # =====================================================================
 async def execute_jarvis_instruction(client: Client, user_instruction: str) -> str:
-    cursor.execute("SELECT chat_id, title, username, chat_type FROM dialogs")
+        cursor.execute("SELECT chat_id, title, username, chat_type FROM dialogs")
     dialogs = cursor.fetchall()
-    dialog_context = "\n".join([f"ID: {d[0]} | Name: {d[1]} | Username: {d[2]} | Type: {d[3]}" for d in dialogs[:200]])
+    words = [w.lower() for w in user_instruction.split() if len(w) > 2]
+    matched = [d for d in dialogs if any(w in (d[1] or "").lower() or w in (d[2] or "").lower() for w in words)]
+    final_dialogs = (matched + [d for d in dialogs if d not in matched])[:50]
+    dialog_context = "\n".join([f"{d[0]}|{d[1]}|{d[2]}|{d[3]}" for d in final_dialogs])
 
     system_prompt = (
         f"You are {BOT_NAME}, an advanced AI Telegram assistant like Tony Stark's Jarvis. "

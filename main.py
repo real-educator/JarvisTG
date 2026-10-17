@@ -1,37 +1,31 @@
 import os
+import json
 import asyncio
 import sqlite3
 from datetime import datetime
-from pyrogram import Client, filters, enums
+from pyrogram import Client, filters
 from pyrogram.types import Message
-from google import genai
-from google.genai import types
+from groq import Groq
 
 # ==================== SAFE CONFIGURATION ====================
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+# Railway mein chahe GROQ_API_KEY naam rakhein ya GEMINI_API_KEY, dono chalega!
+AI_API_KEY = (os.getenv("GROQ_API_KEY") or os.getenv("GEMINI_API_KEY") or "").strip()
 SESSION_STRING = os.getenv("SESSION_STRING", "")
 BOT_NAME = "KSHATRIYA JARVIS"
 # ============================================================
 
 app = Client("kshatriya_jarvis", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
+ai_client = Groq(api_key=AI_API_KEY)
 
-# Clean environment variable conflict & support both AI Studio and Vertex keys
-os.environ.pop("GOOGLE_API_KEY", None)
-if GEMINI_API_KEY.startswith("AQ."):
-    ai_client = genai.Client(vertexai=True, api_key=GEMINI_API_KEY)
-else:
-    ai_client = genai.Client(api_key=GEMINI_API_KEY)
-
-# Folders & Database Setup (Yeh lines aapki file se miss ho gayi thin!)
+# Folders & Database Setup
 CACHE_DIR = os.path.abspath("jarvis_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 conn = sqlite3.connect("jarvis_brain.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Table 1: Messages & Media Cache (For Anti-Delete & Anti-Edit)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS messages (
     chat_id INTEGER,
@@ -46,7 +40,6 @@ CREATE TABLE IF NOT EXISTS messages (
 )
 """)
 
-# Table 2: Telegram Full Dialogs/Contacts Memory (For AI Assistant)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS dialogs (
     chat_id INTEGER PRIMARY KEY,
@@ -61,7 +54,7 @@ conn.commit()
 # =====================================================================
 # HELPER FUNCTIONS: MEDIA DETECTION & NATIVE MEDIA SENDER
 # =====================================================================
-def get_media_type( msg: Message) -> str:
+def get_media_type(msg: Message) -> str:
     if msg.photo: return "photo"
     if msg.video: return "video"
     if msg.voice: return "voice"
@@ -80,7 +73,6 @@ def get_file_id(msg: Message) -> str:
     return None
 
 def is_self_destructing(msg: Message) -> bool:
-    # Checks TTL seconds on Photo/Video/Voice/Audio or raw MTProto ttl_period
     for attr in ["photo", "video", "voice", "audio", "document"]:
         media_obj = getattr(msg, attr, None)
         if media_obj and getattr(media_obj, "ttl_seconds", None):
@@ -90,7 +82,6 @@ def is_self_destructing(msg: Message) -> bool:
     return False
 
 async def send_native_media(client: Client, target_chat, media_type: str, source: str, caption: str = ""):
-    """Bina file corrupt kiye direct Photo/Video/Sticker/Voice show karne wala function"""
     try:
         if media_type == "photo":
             await client.send_photo(target_chat, photo=source, caption=caption)
@@ -119,7 +110,7 @@ async def send_native_media(client: Client, target_chat, media_type: str, source
 
 
 # =====================================================================
-# FEATURE 0: FULL TELEGRAM DATA SYNC (Sabhi Chats/Channels Read Karna)
+# FEATURE 0: FULL TELEGRAM DATA SYNC
 # =====================================================================
 async def sync_telegram_data(client: Client):
     count = 0
@@ -129,7 +120,7 @@ async def sync_telegram_data(client: Client):
         if chat.last_name:
             title += f" {chat.last_name}"
         username = f"@{chat.username}" if chat.username else "None"
-        chat_type = str(chat.type).split(".")[-1]  # PRIVATE, GROUP, SUPERGROUP, CHANNEL
+        chat_type = str(chat.type).split(".")[-1]
         
         cursor.execute(
             "INSERT OR REPLACE INTO dialogs VALUES (?, ?, ?, ?)",
@@ -154,10 +145,8 @@ async def monitor_incoming(client: Client, message: Message):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     local_path = None
 
-    # 1. Check One-Time / Self-Destructing Media
     if is_self_destructing(message):
         try:
-            # Directory path with trailing slash preserves original filename & extension!
             dl_path = await client.download_media(message, file_name=f"{CACHE_DIR}/viewonce_{chat_id}_{msg_id}/")
             caption = (
                 f"🔥 **{BOT_NAME} - One-Time Media Saved!**\n"
@@ -172,10 +161,8 @@ async def monitor_incoming(client: Client, message: Message):
             await client.send_message("me", f"⚠️ **One-Time Save Error:** `{e}`")
         return
 
-    # 2. Download Media with Original Extension for Anti-Delete
     if m_type != "text":
         try:
-            # Trailing slash ensures Pyrogram keeps .jpg, .mp4, .webp, .ogg etc.
             local_path = await client.download_media(
                 message, file_name=f"{CACHE_DIR}/{chat_id}_{msg_id}/"
             )
@@ -189,7 +176,6 @@ async def monitor_incoming(client: Client, message: Message):
     conn.commit()
 
 
-# Manual Command (.save) - Kisi bhi View-Once ya Timer media par reply karke .save likhein
 @app.on_message(filters.me & filters.command("save", prefixes="."))
 async def manual_save_viewonce(client: Client, message: Message):
     await message.delete()
@@ -235,7 +221,7 @@ async def catch_edit(client: Client, message: Message):
 
 
 # =====================================================================
-# FEATURE 3: ANTI-DELETE (Direct Media Show - Photo/Video/Sticker/Voice)
+# FEATURE 3: ANTI-DELETE (Direct Media Show)
 # =====================================================================
 @app.on_deleted_messages()
 async def catch_delete(client: Client, messages: list):
@@ -265,10 +251,8 @@ async def catch_delete(client: Client, messages: list):
             if m_type == "text":
                 await client.send_message("me", caption)
             else:
-                # Use downloaded local file with intact extension, or fallback to file_id
                 media_source = local_path if (local_path and os.path.exists(local_path)) else f_id
                 await send_native_media(client, "me", m_type, media_source, caption)
-                
                 if local_path and os.path.exists(local_path):
                     os.remove(local_path)
 
@@ -277,94 +261,72 @@ async def catch_delete(client: Client, messages: list):
 
 
 # =====================================================================
-# FEATURE 4: AI JARVIS BRAIN (Natural Language Telegram Manager)
+# FEATURE 4: GROQ AI JARVIS BRAIN (100% Free & Ultra-Fast)
 # =====================================================================
 async def execute_jarvis_instruction(client: Client, user_instruction: str) -> str:
-    # Fetch all indexed contacts, groups, and channels
     cursor.execute("SELECT chat_id, title, username, chat_type FROM dialogs")
     dialogs = cursor.fetchall()
-    dialog_context = "\n".join([f"ID: {d[0]} | Name: {d[1]} | Username: {d[2]} | Type: {d[3]}" for d in dialogs[:250]])
-
-    # Define tools that Gemini AI can trigger automatically
-    def send_message_to_chat(chat_id: int, text: str) -> str:
-        """Send a message or post to a specific user, group, or channel ID."""
-        return f"SEND|{chat_id}|{text}"
-
-    def broadcast_to_all_users(text: str) -> str:
-        """Send a message to ALL private users/contacts in Telegram."""
-        return f"BROADCAST|{text}"
-
-    def read_recent_chat_messages(chat_id: int, limit: int = 10) -> str:
-        """Read recent messages from a specific chat ID to summarize or check updates."""
-        return f"READ|{chat_id}|{limit}"
+    dialog_context = "\n".join([f"ID: {d[0]} | Name: {d[1]} | Username: {d[2]} | Type: {d[3]}" for d in dialogs[:200]])
 
     system_prompt = (
-        f"You are {BOT_NAME}, an advanced AI Telegram controller. "
-        f"The user will command you in Hindi, Hinglish, or English. "
-        f"Here is the user's complete Telegram directory (Contacts, Groups, Channels):\n"
-        f"{dialog_context}\n\n"
-        f"Match the name requested by the user with the closest Name/Username in the directory and call the appropriate tool. "
-        f"Always reply respectfully like Tony Stark's Jarvis in Hinglish."
+        f"You are {BOT_NAME}, an advanced AI Telegram assistant like Tony Stark's Jarvis. "
+        f"Here is the user's Telegram directory (Contacts, Groups, Channels):\n{dialog_context}\n\n"
+        f"If the user asks to send a message, post in a channel, broadcast to everyone, or read messages, "
+        f"respond ONLY with a valid JSON object in one of these exact formats:\n"
+        f'1. Send message/post: {{"action": "send", "chat_id": 123456, "text": "message here"}}\n'
+        f'2. Broadcast to all private users: {{"action": "broadcast", "text": "message here"}}\n'
+        f'3. Read chat history: {{"action": "read", "chat_id": 123456, "limit": 10}}\n'
+        f'4. Normal conversation/question: {{"action": "reply", "text": "your Hinglish reply as Jarvis"}}'
     )
 
-    response = ai_client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=user_instruction,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            tools=[send_message_to_chat, broadcast_to_all_users, read_recent_chat_messages],
-            temperature=0.2
-        )
+    completion = ai_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_instruction}
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.2
     )
 
-    # Check if AI decided to run an action/tool
-    if response.function_calls:
-        results = []
-        for call in response.function_calls:
-            name = call.name
-            args = call.args
+    data = json.loads(completion.choices[0].message.content)
+    action = data.get("action")
 
-            if name == "send_message_to_chat":
-                target_id = int(args["chat_id"])
-                msg_text = args["text"]
-                await client.send_message(target_id, msg_text)
-                results.append(f"✅ **Done Sir!** Message/Post sent to `{target_id}`:\n> _{msg_text}_")
+    if action == "send":
+        target_id = int(data["chat_id"])
+        msg_text = data["text"]
+        await client.send_message(target_id, msg_text)
+        return f"✅ **Done Sir!** Message/Post sent to `{target_id}`:\n> _{msg_text}_"
 
-            elif name == "broadcast_to_all_users":
-                msg_text = args["text"]
-                cursor.execute("SELECT chat_id FROM dialogs WHERE chat_type='PRIVATE'")
-                privates = cursor.fetchall()
-                sent = 0
-                for (cid,) in privates:
-                    try:
-                        await client.send_message(cid, msg_text)
-                        sent += 1
-                        await asyncio.sleep(1.5)  # FloodWait protection
-                    except Exception:
-                        pass
-                results.append(f"📢 **Broadcast Complete, Sir!** `{sent}` private contacts ko message bhej diya gaya hai.")
+    elif action == "broadcast":
+        msg_text = data["text"]
+        cursor.execute("SELECT chat_id FROM dialogs WHERE chat_type='PRIVATE'")
+        privates = cursor.fetchall()
+        sent = 0
+        for (cid,) in privates:
+            try:
+                await client.send_message(cid, msg_text)
+                sent += 1
+                await asyncio.sleep(1.5)
+            except Exception:
+                pass
+        return f"📢 **Broadcast Complete, Sir!** `{sent}` private contacts ko message bhej diya gaya hai."
 
-            elif name == "read_recent_chat_messages":
-                target_id = int(args["chat_id"])
-                limit = int(args.get("limit", 10))
-                history = []
-                async for m in client.get_chat_history(target_id, limit=limit):
-                    sender = m.from_user.first_name if m.from_user else "Channel/User"
-                    history.append(f"{sender}: {m.text or '[Media]'}")
-                history.reverse()
-                joined_hist = "\n".join(history)
-                results.append(f"📖 **Last {limit} Messages from `{target_id}`:**\n\n{joined_hist}")
+    elif action == "read":
+        target_id = int(data["chat_id"])
+        limit = int(data.get("limit", 10))
+        history = []
+        async for m in client.get_chat_history(target_id, limit=limit):
+            sender = m.from_user.first_name if m.from_user else "Channel/User"
+            history.append(f"{sender}: {m.text or '[Media]'}")
+        history.reverse()
+        return f"📖 **Last {limit} Messages from `{target_id}`:**\n\n" + "\n".join(history)
 
-        return "\n\n".join(results)
-
-    return response.text or "⚡ Command processed, Sir."
+    return data.get("text", "⚡ Command processed, Sir.")
 
 
-# Trigger 1: Saved Messages mein bina kisi prefix ke direct baat karein!
-# Ya kisi bhi chat mein ".j <instruction>" likhein
 @app.on_message(filters.me & (filters.chat("me") | filters.command("j", prefixes=".")))
 async def jarvis_ai_handler(client: Client, message: Message):
-    # Ignore messages sent by Jarvis itself (which start with emojis used by Jarvis)
     if not message.text or message.text.startswith(("🔥", "🗑️", "✏️", "🤖", "✅", "📢", "📖", "⚠️", "⚡", ".")):
         if not message.text or not message.text.startswith(".j "):
             return
@@ -379,7 +341,6 @@ async def jarvis_ai_handler(client: Client, message: Message):
         await status_msg.edit_text(f"⚠️ **Jarvis AI Error:** `{e}`")
 
 
-# Trigger 2: Manual Data Sync Command (.sync)
 @app.on_message(filters.me & filters.command("sync", prefixes="."))
 async def manual_sync(client: Client, message: Message):
     await message.edit_text(f"🔄 **{BOT_NAME}:** Scanning all Telegram Chats, Groups & Channels...")
@@ -387,22 +348,20 @@ async def manual_sync(client: Client, message: Message):
     await message.edit_text(f"✅ **{BOT_NAME} Memory Updated!**\nTotal `{total}` Contacts, Groups & Channels indexed.")
 
 
-# Startup Initialization
 async def start_jarvis():
     await app.start()
-    print(f"🔄 {BOT_NAME} is reading your Telegram data...")
     total = await sync_telegram_data(app)
-    print(f"✅ Synced {total} chats! {BOT_NAME} is now Fully Active!")
     await app.send_message(
         "me",
-        f"⚡ **{BOT_NAME} v2.0 Online, Sir!**\n"
-        f"📂 **Total Chats Read & Indexed:** `{total}`\n"
+        f"⚡ **{BOT_NAME} v3.0 (Groq Powered) Online, Sir!**\n"
+        f"📂 **Total Chats Indexed:** `{total}`\n"
         f"🛡️ **Anti-Delete (Direct Media):** Active\n"
         f"🔥 **View-Once Saver:** Active\n"
         f"✏️ **Edit Tracker:** Active\n\n"
-        f"💡 _Aap isi Saved Messages chat mein seedha Hindi/Hinglish mein hukum de sakte hain!_"
+        f"💡 _Ab aap isi Saved Messages mein seedha Hinglish mein hukum de sakte hain!_"
     )
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
     app.run(start_jarvis())
+        

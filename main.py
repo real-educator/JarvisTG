@@ -15,10 +15,8 @@ BOT_NAME = "KSHATRIYA JARVIS"
 SESSION_STRING = "BQJE948AKyGe3jgMEA8xSp-yzz4n5KdY1VrYLK-EWGOVL7aYNUblqizWwo9RB6C7RB4mt03PjkqCdNuOGnN_VhJo0U7Q3fZL6OnfYFmCoUGvStWeWCX5Y-nvn_mYLPcaN0-Q7O95WD8bNVSKnQ-Ji0n3_bAW2z8NqJwZI4cWvj7nzofoke23Ux7dvJ0zZP2brIQfanf-QS0rvuv2EsYXe1KaFMATrSpMdtH1gwUFbjLTIqZewztWAaBG3Gabupbrmwgo_-SvAvXzGdWzX9Wv6rCNFACC3Esy0LQRzJRDlVpbkQu1XO8LyS88eT-KhE_5SpW8GMK7y5L3o24EyN4GM9JqzqGO7QAAAAG_2mhyAA"
 # =======================================================
 
-app = Client("kshatriya_jarvis", api_id=API_ID, api_hash=API_HASH)
+app = Client("kshatriya_jarvis", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
-session_string=SESSION_STRING)
-
 # Folders & Database Setup
 CACHE_DIR = os.path.abspath("jarvis_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)

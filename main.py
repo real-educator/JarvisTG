@@ -264,7 +264,7 @@ async def catch_delete(client: Client, messages: list):
 # FEATURE 4: GROQ AI JARVIS BRAIN (100% Free & Ultra-Fast)
 # =====================================================================
 async def execute_jarvis_instruction(client: Client, user_instruction: str) -> str:
-        cursor.execute("SELECT chat_id, title, username, chat_type FROM dialogs")
+    cursor.execute("SELECT chat_id, title, username, chat_type FROM dialogs")
     dialogs = cursor.fetchall()
     words = [w.lower() for w in user_instruction.split() if len(w) > 2]
     matched = [d for d in dialogs if any(w in (d[1] or "").lower() or w in (d[2] or "").lower() for w in words)]

@@ -10,7 +10,7 @@ from google.genai import types
 # ==================== CONFIGURATION ====================
 API_ID = 38074255  # Apna API ID yahan daalein (Integer)
 API_HASH = "b24d8bf27bba4316a37c4bf2a7e9b9cf"  # Apna API HASH yahan daalein
-GEMINI_API_KEY = "AQ.Ab8RN6LiakOLIb4EMpj2JeIdqv-WypvYrwo_hJHflSsZufnCwA"  # Google AI Studio se free key daalein
+GEMINI_API_KEY = "AQ.Ab8RN6JOOWHKx7N3AqVMgjTmBqmYUdct3ro03oxCinpCxTLwhw"  # Google AI Studio se free key daalein
 BOT_NAME = "KSHATRIYA JARVIS"
 SESSION_STRING = "BQJE948AKyGe3jgMEA8xSp-yzz4n5KdY1VrYLK-EWGOVL7aYNUblqizWwo9RB6C7RB4mt03PjkqCdNuOGnN_VhJo0U7Q3fZL6OnfYFmCoUGvStWeWCX5Y-nvn_mYLPcaN0-Q7O95WD8bNVSKnQ-Ji0n3_bAW2z8NqJwZI4cWvj7nzofoke23Ux7dvJ0zZP2brIQfanf-QS0rvuv2EsYXe1KaFMATrSpMdtH1gwUFbjLTIqZewztWAaBG3Gabupbrmwgo_-SvAvXzGdWzX9Wv6rCNFACC3Esy0LQRzJRDlVpbkQu1XO8LyS88eT-KhE_5SpW8GMK7y5L3o24EyN4GM9JqzqGO7QAAAAG_2mhyAA"
 # =======================================================

@@ -10,12 +10,26 @@ from google.genai import types
 # ==================== SAFE CONFIGURATION ====================
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 SESSION_STRING = os.getenv("SESSION_STRING", "")
 BOT_NAME = "KSHATRIYA JARVIS"
 # ============================================================
+
 app = Client("kshatriya_jarvis", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
+
+# Clean environment variable conflict & support both AI Studio and Vertex keys
+os.environ.pop("GOOGLE_API_KEY", None)
+if GEMINI_API_KEY.startswith("AQ."):
+    ai_client = genai.Client(vertexai=True, api_key=GEMINI_API_KEY)
+else:
+    ai_client = genai.Client(api_key=GEMINI_API_KEY)
+
+# Folders & Database Setup (Yeh lines aapki file se miss ho gayi thin!)
+CACHE_DIR = os.path.abspath("jarvis_cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+conn = sqlite3.connect("jarvis_brain.db", check_same_thread=False)
+cursor = conn.cursor()
 
 # Table 1: Messages & Media Cache (For Anti-Delete & Anti-Edit)
 cursor.execute("""

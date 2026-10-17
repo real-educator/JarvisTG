@@ -279,8 +279,18 @@ async def execute_jarvis_instruction(client: Client, user_instruction: str) -> s
         f'4. Normal conversation/question: {{"action": "reply", "text": "your Hinglish reply as Jarvis"}}'
     )
 
+        # Groq se automatically active chat models ki list nikalna
+    available_models = [
+        m.id for m in ai_client.models.list().data 
+        if "whisper" not in m.id.lower() and "guard" not in m.id.lower() and "tts" not in m.id.lower()
+    ]
+    
+    # Best model chuno, warna jo bhi pehla active model mile wo chala do
+    preferred = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama3-70b-8192", "gemma2-9b-it", "mixtral-8x7b-32768"]
+    active_model = next((m for m in preferred if m in available_models), available_models[0])
+
     completion = ai_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=active_model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_instruction}

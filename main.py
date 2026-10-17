@@ -16,7 +16,11 @@ SESSION_STRING = "BQJE948AKyGe3jgMEA8xSp-yzz4n5KdY1VrYLK-EWGOVL7aYNUblqizWwo9RB6
 # =======================================================
 
 app = Client("kshatriya_jarvis", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
+# Agar key 'AQ.' se start hoti hai toh vertexai=True lagayein, warna normal
+if GEMINI_API_KEY.startswith("AQ."):
+    ai_client = genai.Client(vertexai=True, api_key=GEMINI_API_KEY)
+else:
+    ai_client = genai.Client(api_key=GEMINI_API_KEY)
 # Folders & Database Setup
 CACHE_DIR = os.path.abspath("jarvis_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)

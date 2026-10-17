@@ -279,15 +279,30 @@ async def execute_jarvis_instruction(client: Client, user_instruction: str) -> s
         f'4. Normal conversation/question: {{"action": "reply", "text": "your Hinglish reply as Jarvis"}}'
     )
 
-        # Groq se automatically active chat models ki list nikalna
-    available_models = [
-        m.id for m in ai_client.models.list().data 
-        if "whisper" not in m.id.lower() and "guard" not in m.id.lower() and "tts" not in m.id.lower()
+    # Sirf pure Text/Chat models filter karna (Audio/Terms wale models ko block karna)
+    all_models = [m.id for m in ai_client.models.list().data]
+    
+    # Sabse best aur latest Groq Models ki priority list
+    preferred = [
+        "llama-3.3-70b-versatile",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "qwen-qwq-32b",
+        "deepseek-r1-distill-llama-70b",
+        "gemma2-9b-it",
+        "llama-3.1-8b-instant",
+        "llama3-8b-8192"
     ]
     
-    # Best model chuno, warna jo bhi pehla active model mile wo chala do
-    preferred = ["llama-3.1-8b-instant", "llama3-8b-8192", "llama3-70b-8192", "gemma2-9b-it", "mixtral-8x7b-32768"]
-    active_model = next((m for m in preferred if m in available_models), available_models[0])
+    # Pehle preferred list mein se match karo, warna koi bhi 'llama' ya 'gemma' model uthao
+    active_model = next((m for m in preferred if m in all_models), None)
+    if not active_model:
+        chat_models = [
+            m for m in all_models 
+            if ("llama" in m.lower() or "gemma" in m.lower() or "qwen" in m.lower())
+            and not any(bad in m.lower() for bad in ["guard", "whisper", "vision", "orpheus", "canopy", "tts", "audio"])
+        ]
+        active_model = chat_models[0]
 
     completion = ai_client.chat.completions.create(
         model=active_model,
